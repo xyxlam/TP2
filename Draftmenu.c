@@ -9,7 +9,7 @@ void printMenu() {
 }
 
 void patriciaTreeMenu() {
-    NoPatrica* root = NULL;
+    NoPatricia* root = NULL;
     char key[100];
     int choice;
     

@@ -1,215 +1,121 @@
 #include "tp2.h"
 
-// Helper Functions
-int getBit(const char* key, int bitIndex) {
-    if (!key || bitIndex < 0) return -1;
-    int byteIndex = bitIndex / 8;
-    int bitOffset = bitIndex % 8;
-    if (byteIndex >= strlen(key)) return 0;
-    return (key[byteIndex] >> (7 - bitOffset)) & 1;
+int bit(char *chave, int i) {
+    int byte = i / 8;
+    int bit = 7 - (i % 8);
+    return (chave[byte] >> bit) & 1;
 }
 
-int firstDifferentBit(const char* key1, const char* key2) {
-    if (!key1 || !key2) return -1;
-    int i = 0;
-    while (key1[i] == key2[i] && key1[i] != '\0' && key2[i] != '\0') {
-        i++;
-    }
-    if (key1[i] == '\0' && key2[i] == '\0') return -1;
-    
-    int bit = 0;
-    while (getBit(key1, i * 8 + bit) == getBit(key2, i * 8 + bit)) {
-        bit++;
-    }
-    return i * 8 + bit;
+NoPatricia *novoNo(char *chave, int bit){
+    NoPatricia *no = (NoPatricia* ) malloc(sizeof(NoPatricia));
+    strcpy(no->chave, chave);
+    no->bit = bit;
+    no->esq = no->dir = NULL;
+    return no;
 }
 
-// PATRICIA Tree Implementation
-NoPatricia* createNoPatricia(const char* key, int bitIndex) {
-    NoPatricia* node = (NoPatricia*)malloc(sizeof(NoPatricia));
-    if (!node) return NULL;
-    
-    node->key = strdup(key);
-    node->bitIndex = bitIndex;
-    node->left = node->right = NULL;
-    return node;
-}
+NoPatricia *inserir_patricia(NoPatricia *raiz, char *chave) {
+    if (raiz == NULL) return novoNo(chave, -1);
 
-void insertPatricia(NoPatricia** root, const char* key) {
-    if (!key) return;
-    
-    if (!*root) {
-        *root = createNoPatricia(key, -1);
-        return;
+    NoPatricia *p = raiz, *q = NULL;
+    while (p->bit >= 0 && bit(chave, p->bit) == bit(p->chave, p->bit)) {
+        q = p;
+        p = bit(chave, p->bit) ? p->dir : p->esq;
     }
     
-    NoPatricia* current = *root;
-    NoPatricia* parent = NULL;
-    int direction = 0;
-    
-    while (current->bitIndex < current->left->bitIndex) {
-        parent = current;
-        direction = getBit(key, current->bitIndex);
-        current = direction ? current->right : current->left;
+    int i;
+    for(i = 0; i< strlen(chave) * 8; i++) {
+        if (bit(chave, i) != bit(p->chave,i)) break;
     }
-    
-    if (strcmp(current->key, key) == 0) return; // Key already exists
-    
-    int diffBit = firstDifferentBit(current->key, key);
-    NoPatricia* newNode = createNoPatricia(key, diffBit);
-    
-    if (!parent) {
-        *root = newNode;
+
+    NoPatricia *novo = novoNo(chave, i);
+    if (bit(chave, i)) {
+        novo->esq = p;
+        novo->dir = novo;
     } else {
-        if (direction) parent->right = newNode;
-        else parent->left = newNode;
+        novo->esq = novo;
+        novo->dir = p;
     }
-    
-    int newDirection = getBit(key, diffBit);
-    if (newDirection) {
-        newNode->left = current;
-        newNode->right = newNode;
-    } else {
-        newNode->left = newNode;
-        newNode->right = current;
+
+    if (q == NULL) return novo;
+
+    if (bit(chave, q->bit))
+        q->dir = novo;
+    else
+        q->esq = novo;
+    return raiz;
+}
+
+int pesquisar_Patricia(NoPatricia *raiz, char *chave) {
+    if (raiz == NULL) return 0;
+    NoPatricia *p = raiz;
+    while (p->bit >= 0) {
+        p = bit(chave, p->bit) ? p->dir : p->esq;
+    }
+    return strcmp(p->chave, chave) == 0;
+}
+
+void imprimir_pre_ordem(NoPatricia *raiz) {
+    if (raiz == NULL) return;
+    printf("Chave: %s | Bit: %d\n", raiz->chave, raiz->bit);
+    if(raiz->bit >= 0) {
+        imprimir_pre_ordem(raiz->esq);
+        imprimir_pre_ordem(raiz->dir);
     }
 }
 
-void removePatricia(NoPatricia** root, const char* key) {
-    if (!*root || !key) return;
-    
-    NoPatricia* current = *root;
-    NoPatricia* parent = NULL;
-    NoPatricia* grandparent = NULL;
-    int parentDirection = 0;
-    
-    while (current->bitIndex < current->left->bitIndex) {
-        grandparent = parent;
-        parent = current;
-        parentDirection = getBit(key, current->bitIndex);
-        current = parentDirection ? current->right : current->left;
+//Implementação da Hash Table
+char* tabela[TAM_HASH];
+
+void inicializar_tabela() {
+    for (int i = 0; i <  TAM_HASH; i++) {
+        tabela[i] = NULL;
     }
-    
-    if (strcmp(current->key, key) != 0) return; // Key not found
-    
-    if (!parent) {
-        free(current->key);
-        free(current);
-        *root = NULL;
-        return;
-    }
-    
-    NoPatricia* sibling = (parentDirection) ? parent->left : parent->right;
-    
-    if (!grandparent) {
-        *root = sibling;
-    } else {
-        if (parentDirection) grandparent->right = sibling;
-        else grandparent->left = sibling;
-    }
-    
-    free(current->key);
-    free(current);
-    free(parent->key);
-    free(parent);
 }
 
-void printPreOrderPatricia(NoPatricia* root) {
-    if (!root) return;
-    
-    printf("%s ", root->key);
-    if (root->left && root->left->bitIndex > root->bitIndex)
-        printPreOrderPatricia(root->left);
-    if (root->right && root->right->bitIndex > root->bitIndex)
-        printPreOrderPatricia(root->right);
+int hash1(char *chave) {
+    int soma = 0;
+    for (int i = 0; chave[i]; i++)
+        soma += chave[i];
+    return soma % TAM_HASH;
 }
 
-bool searchPatricia(NoPatricia* root, const char* key) {
-    if (!root || !key) return false;
-    
-    NoPatricia* current = root;
-    while (current->bitIndex < current->left->bitIndex) {
-        current = getBit(key, current->bitIndex) ? current->right : current->left;
-    }
-    
-    return strcmp(current->key, key) == 0;
+int hash2(char *chave) {
+    int soma = 0;
+    for (int  i = 0; chave[i]; i++)
+        soma += chave[i];
+    return 1 + (soma % (TAM_HASH - 1));
 }
 
-void freePatriciaTree(NoPatricia* root) {
-    if (!root) return;
-    
-    if (root->left && root->left->bitIndex > root->bitIndex)
-        freePatriciaTree(root->left);
-    if (root->right && root->right->bitIndex > root->bitIndex)
-        freePatriciaTree(root->right);
-    
-    free(root->key);
-    free(root);
-}
+void inserir_hash(char *chave) {
+    int h1 = hash1(chave);
+    int h2 = hash2(chave);
 
-// Menu Implementation
-void printMenu() {
-    printf("\n=== Menu PATRICIA Tree ===\n");
-    printf("1. Inserir chave\n");
-    printf("2. Remover chave\n");
-    printf("3. Pesquisar chave\n");
-    printf("4. Imprimir em pre-ordem\n");
-    printf("0. Sair\n");
-    printf("Escolha uma opcao: ");
-}
-
-int main() {
-    NoPatricia* root = NULL;
-    char key[100];
-    int choice;
-    
-    printf("Bem-vindo ao Teste da PATRICIA Tree\n");
-    printf("==================================\n");
-    
-    while (1) {
-        printMenu();
-        scanf("%d", &choice);
-        getchar(); // Limpar o buffer do teclado
-        
-        switch (choice) {
-            case 1:
-                printf("Digite a chave para inserir: ");
-                fgets(key, sizeof(key), stdin);
-                key[strcspn(key, "\n")] = 0; // Remove o \n do final
-                insertPatricia(&root, key);
-                printf("Chave inserida!\n");
-                break;
-                
-            case 2:
-                printf("Digite a chave para remover: ");
-                fgets(key, sizeof(key), stdin);
-                key[strcspn(key, "\n")] = 0;
-                removePatricia(&root, key);
-                printf("Operacao de remocao concluida!\n");
-                break;
-                
-            case 3:
-                printf("Digite a chave para pesquisar: ");
-                fgets(key, sizeof(key), stdin);
-                key[strcspn(key, "\n")] = 0;
-                printf("Chave '%s': %s\n", key, searchPatricia(root, key) ? "Encontrada" : "Nao encontrada");
-                break;
-                
-            case 4:
-                printf("Arvore em pre-ordem: ");
-                printPreOrderPatricia(root);
-                printf("\n");
-                break;
-                
-            case 0:
-                printf("Saindo do programa...\n");
-                freePatriciaTree(root);
-                return 0;
-                
-            default:
-                printf("Opcao invalida!\n");
+    for (int i = 0; i < TAM_HASH; i++) {
+        int pos = (h1 + i * h2) % TAM_HASH;
+        if (tabela[pos] == NULL) {
+            tabela[pos] = strdup(chave);
+            return;
         }
     }
-    
+    printf("Tabela cheia. Não foi possível inserir.\n");
+}
+
+int pesquisar_hash(char *chave) {
+    int h1 = hash1(chave);
+    int h2 = hash2(chave);
+
+    for (int i = 0; i < TAM_HASH; i++) {
+        int pos = (h1 + i * h2 ) % TAM_HASH;
+        if(tabela[pos] == NULL) return 0;
+        if (strcmp(tabela[pos], chave) == 0) return 1;
+    }
     return 0;
+}
+
+void imprimir_hash() {
+    for(int i = 0; i < TAM_HASH; i++) {
+        if (tabela[i] != NULL)
+            printf("Posição %d: %s\n", i, tabela[i]);
+    }
 }
