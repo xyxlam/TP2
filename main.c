@@ -2,7 +2,7 @@
 
 void testPatriciaTree() {
     printf("\n=== Testing PATRICIA Tree ===\n");
-    NoPatrica* root = NULL;
+    NoPatricia* root = NULL;
     
     // Test insertion
     printf("\nInserting keys: 'test', 'team', 'toast', 'taste'\n");
@@ -71,7 +71,7 @@ void printMenu() {
 }
 
 void patricaTreeMenu(){
-    NoPatrica* root = NULL;
+    NoPatricia* root = NULL;
     char key[100];
     int choice;
 
